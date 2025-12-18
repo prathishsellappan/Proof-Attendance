@@ -1,0 +1,428 @@
+Proof-of-Attendance Website
+(Hedera + IPFS (Pinata) + Organizer-Controlled Attendance Window)
+
+0️⃣ SYSTEM OVERVIEW
+Actors
+
+Organizer
+
+Student
+
+Verifier (public)
+
+Backend Server
+
+Hedera Network
+
+IPFS (Pinata)
+
+1️⃣ TECHNOLOGY STACK (CLEAR ASSUMPTIONS)
+Frontend
+
+React / Next.js
+
+Wallet integration (HashPack / Blade)
+
+Browser GPS API
+
+Role-based dashboards
+
+Backend
+
+Node.js (Express / NestJS)
+
+Hedera SDK
+
+Pinata SDK
+
+Geo-distance computation
+
+JWT-based auth
+
+Storage
+
+Relational DB (Postgres / MySQL)
+
+Redis (optional, for state & rate limits)
+
+IPFS via Pinata (student data, images, metadata)
+
+Blockchain
+
+Hedera Testnet
+
+Hedera Token Service (NFT, Soulbound)
+
+Mirror Node for reads
+
+2️⃣ CORE DATA MODELS (BACKEND)
+Organizer
+{
+  "organizerId": "ORG123",
+  "name": "IEEE PSG",
+  "email": "ieee@psg.edu",
+  "hederaAccountId": "0.0.5001"
+}
+
+Student (Off-chain mapping only)
+{
+  "studentId": "STU456",
+  "hederaAccountId": "0.0.1234",
+  "studentProfileCID": "bafybeistudentprofilehash"
+}
+
+Student Profile (Stored on IPFS)
+{
+  "name": "Prathish R",
+  "college": "PSG College of Technology",
+  "department": "CSE",
+  "rollNo": "21CS123"
+}
+
+Event
+{
+  "eventId": 101,
+  "name": "Blockchain Workshop",
+  "date": "2025-02-17",
+  "venue": {
+    "lat": 11.02,
+    "long": 76.94
+  },
+  "radius": 100,
+  "badgeImageCID": "bafybeibadgeimagehash",
+  "attendanceStatus": "CLOSED",
+  "organizerId": "ORG123"
+}
+
+Registration
+{
+  "eventId": 101,
+  "studentAccountId": "0.0.1234",
+  "registeredAt": "timestamp",
+  "claimed": false
+}
+
+3️⃣ FRONTEND PAGES & BACKEND APIs
+Organizer Frontend Pages
+
+/organizer/login
+
+/organizer/dashboard
+
+/organizer/create-event
+
+/organizer/event/:id
+
+Student Frontend Pages
+
+/student/login
+
+/student/profile
+
+/student/events
+
+/student/event/:id
+
+4️⃣ DETAILED FLOW — ORGANIZER SIDE
+4.1 Organizer Login
+
+Frontend
+
+Organizer enters credentials
+
+JWT stored in browser
+
+Backend
+
+Authenticates organizer
+
+Issues JWT with role = ORGANIZER
+
+4.2 Organizer Creates Event (VERY IMPORTANT)
+
+Frontend
+Organizer fills:
+
+Event name
+
+Date & time
+
+Venue lat/long
+
+Radius
+
+Badge image upload (PNG/JPG)
+
+Backend (Step-by-step)
+
+Validate organizer role
+
+Upload badge image to Pinata
+
+Receive badgeImageCID
+
+Create event in DB
+
+Set:
+
+attendanceStatus = "CLOSED"
+
+
+✅ No Hedera call
+✅ Image immutable via IPFS
+
+4.3 Organizer Views Event Dashboard
+
+Organizer sees:
+
+Registered students count
+
+Attendance status
+
+Buttons:
+
+START ATTENDANCE
+
+STOP ATTENDANCE
+
+4.4 Organizer Starts Attendance
+
+Frontend
+
+Organizer clicks “Start Attendance”
+
+Backend
+
+attendanceStatus = "OPEN"
+attendanceStartedAt = timestamp
+
+
+📌 This is the only condition enabling badge claims.
+
+5️⃣ DETAILED FLOW — STUDENT SIDE
+5.1 Student Login & Wallet Connect
+
+Frontend
+
+Student logs in
+
+Connects Hedera wallet
+
+Wallet account ID captured
+
+Backend
+
+Stores wallet mapping (if new)
+
+5.2 Student Creates Profile (One-Time)
+
+Frontend
+Student enters:
+
+Name
+
+College
+
+Department
+
+Roll No
+
+Backend
+
+Creates JSON
+
+Uploads to Pinata
+
+Receives studentProfileCID
+
+Stores:
+
+studentAccountId → studentProfileCID
+
+
+📌 No PII stored in DB long-term
+
+5.3 Student Registers for Event
+
+Frontend
+
+Student selects event
+
+Clicks Register
+
+(Optional)
+
+Wallet signs registration message
+
+Backend
+
+Stores registration record
+
+6️⃣ ATTENDANCE CLAIM FLOW (CORE LOGIC)
+6.1 Student Opens Event During Attendance Window
+
+Frontend
+
+Fetch event
+
+Check:
+
+attendanceStatus === OPEN
+
+
+❌ If closed → show error
+✅ If open → continue
+
+6.2 Location Verification
+
+Frontend
+
+Requests GPS permission
+
+Sends lat/long to backend
+
+Backend
+
+Calculates distance (Haversine)
+
+Compares with event radius
+
+❌ Outside → reject
+✅ Inside → allow claim
+
+6.3 Student Clicks “Get Badge”
+
+Frontend
+
+Wallet signs:
+
+I am present at Event 101 and claim my attendance badge
+
+
+Backend Validations (ALL REQUIRED)
+
+Attendance is OPEN
+
+Student registered
+
+Student not already claimed
+
+Wallet signature valid
+
+Location verified
+
+❌ Any failure → reject
+✅ All pass → mint NFT
+
+7️⃣ NFT METADATA & MINTING (DETAILED)
+7.1 NFT Metadata Creation
+{
+  "name": "Blockchain Workshop – Proof of Attendance",
+  "description": "Issued for attending Blockchain Workshop",
+  "image": "ipfs://bafybeibadgeimagehash",
+  "attributes": [
+    { "trait_type": "Event ID", "value": "101" },
+    { "trait_type": "Student Profile CID", "value": "bafybeistudentprofilehash" },
+    { "trait_type": "Issued By", "value": "IEEE PSG" },
+    { "trait_type": "Date", "value": "2025-02-17" }
+  ]
+}
+
+7.2 Upload Metadata to Pinata
+
+Backend uploads → receives metadataCID
+
+7.3 Hedera NFT Mint
+
+Backend (Supply Key Holder)
+
+1️⃣ Mint NFT:
+
+TokenMintTransaction
+  .setTokenId(tokenId)
+  .setMetadata([
+    Buffer.from("ipfs://metadataCID")
+  ])
+
+
+2️⃣ Transfer NFT:
+
+TransferTransaction
+  .addNftTransfer(tokenId, serial, treasuryId, studentAccountId)
+
+
+📌 NFT:
+
+Soulbound
+
+Non-transferable
+
+Permanent
+
+7.4 Backend Updates Registration
+claimed = true
+claimedAt = timestamp
+
+8️⃣ ORGANIZER STOPS ATTENDANCE
+
+Frontend
+
+Organizer clicks “Stop Attendance”
+
+Backend
+
+attendanceStatus = "CLOSED"
+
+
+📌 No further claims possible.
+
+9️⃣ AFTER EVENT
+9.1 Student Views Badge
+
+Frontend
+
+Fetch NFTs from mirror node
+
+Display badge image + metadata
+
+9.2 Public Verification (Trustless)
+
+Verifier Page
+
+Takes tokenId + serial
+
+Fetches:
+
+Owner (mirror node)
+
+Metadata (IPFS)
+
+Displays:
+
+✔ VERIFIED ATTENDANCE
+Event: Blockchain Workshop
+Student Wallet: 0.0.1234
+Issuer: IEEE PSG
+Soulbound: Yes
+
+🔐 SECURITY GUARANTEES (FINAL)
+
+✔ Organizer controls attendance timing
+✔ Location ensures physical presence
+✔ Wallet proves identity
+✔ One badge per student
+✔ No badge transfer possible
+✔ PII never on-chain
+✔ Immutable public verification
+
+⚠️ ACKNOWLEDGED LIMITATIONS
+
+GPS spoofing possible
+
+Backend enforces eligibility
+
+Acceptable for campus-scale events
+
+🎯 FINAL ONE-LINE DEFENSE
+
+“Our system uses organizer-controlled attendance windows, wallet-based identity, and location verification to issue non-transferable Hedera NFTs as proof of attendance, while keeping all personal data off-chain in decentralized storage for privacy.”

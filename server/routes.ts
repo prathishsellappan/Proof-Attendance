@@ -616,7 +616,7 @@ export async function registerRoutes(
       const metadata = {
         name: `${event.name} – Proof of Attendance`,
         description: `Issued to ${student.name || "Student"} for attending ${event.name}`,
-        image: event.badgeImageCID ? `ipfs://${event.badgeImageCID}` : "",
+        image: event.badgeImageCID ? `https://gateway.pinata.cloud/ipfs/${event.badgeImageCID}` : "",
         // Pinata/OpenSea properties
         properties: {
           studentName: student.name,

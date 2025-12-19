@@ -7,6 +7,8 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
+import axios from "axios";
+import FormData from "form-data";
 import {
   Client,
   PrivateKey,
@@ -79,7 +81,86 @@ function authenticateToken(req: Request, res: Response, next: Function) {
 }
 
 // Simulated IPFS upload (writes to local disk)
-async function uploadToIPFS(data: Buffer | object): Promise<string> {
+// Pinata IPFS Upload
+async function uploadToPinata(fileBuffer: Buffer, fileName: string, fileType: string = "image/png"): Promise<string> {
+  const jwt = process.env.PINATA_JWT;
+  if (!jwt) {
+    console.warn("Missing PINATA_JWT, falling back to local IPFS mock");
+    return uploadToIPFS(fileBuffer);
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append("file", fileBuffer, { filename: fileName, contentType: fileType });
+
+    const metadata = JSON.stringify({
+      name: fileName,
+    });
+    formData.append("pinataMetadata", metadata);
+
+    const options = JSON.stringify({
+      cidVersion: 1,
+    });
+    formData.append("pinataOptions", options);
+
+    const res = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        ...formData.getHeaders(),
+      },
+    });
+
+    console.log("Pinata Upload Success:", res.data.IpfsHash);
+    return res.data.IpfsHash;
+
+  } catch (error: any) {
+    console.error("Pinata Upload Failed:", error.response?.data || error.message);
+    throw new Error("Failed to upload to Pinata");
+  }
+}
+
+async function uploadJsonToPinata(jsonData: object, name: string): Promise<string> {
+  const jwt = process.env.PINATA_JWT;
+  if (!jwt) {
+    console.warn("Missing PINATA_JWT for JSON, using mock");
+    return uploadToIPFS(jsonData);
+  }
+
+  try {
+    const res = await axios.post("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
+      pinataContent: jsonData,
+      pinataMetadata: { name: name }
+    }, {
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    console.log("Pinata JSON Upload Success:", res.data.IpfsHash);
+    return res.data.IpfsHash;
+  } catch (error: any) {
+    console.error("Pinata JSON Upload Failed:", error.response?.data || error.message);
+    throw new Error("Failed to upload JSON to Pinata");
+  }
+}
+
+// Simulated IPFS upload (writes to local disk) OR Pinata Dispatch
+async function uploadToIPFS(data: Buffer | object, fileName: string = "file"): Promise<string> {
+  // If Pinata JWT is present, use it
+  if (process.env.PINATA_JWT) {
+    if (Buffer.isBuffer(data)) {
+      // Avoid infinite recursion if uploadToPinata calls uploadToIPFS fallback
+      // But here we checked logic inside uploadToPinata too?
+      // Actually uploadToPinata calls uploadToIPFS if no JWT. 
+      // So if WE are here, JWT is present (checked above), so we call uploadToPinata.
+      return uploadToPinata(data, fileName);
+    } else {
+      return uploadJsonToPinata(data, fileName);
+    }
+  }
+
+  // Fallback to Local Mock
   const mockCID = `bafybei${randomUUID().replace(/-/g, '').substring(0, 46)}`;
   const filePath = path.join(UPLOADS_DIR, mockCID);
 
@@ -225,7 +306,7 @@ export async function registerRoutes(
   // Student Registration
   app.post("/api/auth/student/register", async (req, res) => {
     try {
-      const { email, password, hederaAccountId } = req.body;
+      const { email, password, hederaAccountId, name, college, rollNo } = req.body;
 
       const existing = await storage.getStudentByEmail(email);
       if (existing) {
@@ -238,10 +319,10 @@ export async function registerRoutes(
         password: hashedPassword,
         hederaAccountId: hederaAccountId || null,
         profileCID: null,
-        name: null,
-        college: null,
+        name: name || null,
+        college: college || null,
         department: null,
-        rollNo: null,
+        rollNo: rollNo || null,
       });
 
       const token = jwt.sign({ id: student.id, email, role: "student" }, JWT_SECRET, { expiresIn: "7d" });
@@ -534,18 +615,28 @@ export async function registerRoutes(
       // Create NFT metadata
       const metadata = {
         name: `${event.name} – Proof of Attendance`,
-        description: `Issued for attending ${event.name}`,
+        description: `Issued to ${student.name || "Student"} for attending ${event.name}`,
         image: event.badgeImageCID ? `ipfs://${event.badgeImageCID}` : "",
+        // Pinata/OpenSea properties
+        properties: {
+          studentName: student.name,
+          college: student.college,
+          rollNo: student.rollNo,
+          eventId: event.id,
+          date: event.date,
+        },
         attributes: [
+          { trait_type: "Student Name", value: student.name || "Unknown" },
+          { trait_type: "College", value: student.college || "Unknown" },
+          { trait_type: "Roll No", value: student.rollNo || "Unknown" },
           { trait_type: "Event ID", value: event.id },
-          { trait_type: "Student Profile CID", value: student.profileCID || "" },
           { trait_type: "Issued By", value: organizer?.name || "" },
           { trait_type: "Date", value: event.date },
         ],
       };
 
       // Upload metadata to IPFS
-      const metadataCID = await uploadToIPFS(metadata);
+      const metadataCID = await uploadToIPFS(metadata, `metadata-${event.id}-${student.id}.json`);
 
       // Mint NFT
       const { serial } = await mintNFT(event.tokenId || "", metadataCID, student.hederaAccountId);

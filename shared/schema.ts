@@ -75,13 +75,13 @@ export const registrations = pgTable("registrations", {
   metadataCID: text("metadata_cid"),
 });
 
-export const insertRegistrationSchema = createInsertSchema(registrations).omit({ 
-  id: true, 
-  registeredAt: true, 
-  claimed: true, 
+export const insertRegistrationSchema = createInsertSchema(registrations).omit({
+  id: true,
+  registeredAt: true,
+  claimed: true,
   claimedAt: true,
   nftSerial: true,
-  metadataCID: true 
+  metadataCID: true
 });
 export type InsertRegistration = z.infer<typeof insertRegistrationSchema>;
 export type Registration = typeof registrations.$inferSelect;
@@ -117,6 +117,9 @@ export const registerStudentSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   hederaAccountId: z.string().optional(),
+  name: z.string().optional(),
+  college: z.string().optional(),
+  rollNo: z.string().optional(),
 });
 export type RegisterStudent = z.infer<typeof registerStudentSchema>;
 

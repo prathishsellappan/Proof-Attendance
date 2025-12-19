@@ -26,6 +26,9 @@ export default function StudentRegister() {
       email: "",
       password: "",
       hederaAccountId: "",
+      name: "",
+      college: "",
+      rollNo: "",
     },
   });
 
@@ -87,6 +90,47 @@ export default function StudentRegister() {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="college"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>College</FormLabel>
+                        <FormControl>
+                          <Input placeholder="MIT" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="rollNo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Roll No</FormLabel>
+                        <FormControl>
+                          <Input placeholder="123456" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <FormField
                   control={form.control}
                   name="email"

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Wallet, Copy, Check, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
@@ -19,26 +22,30 @@ interface WalletConnectProps {
 
 export function WalletConnect({ walletId, onConnect, compact = false }: WalletConnectProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [manualId, setManualId] = useState("");
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
-  const handleConnect = async (walletType: "hashpack" | "blade") => {
-    setIsConnecting(true);
-    
-    // Simulate wallet connection - in production, this would use actual wallet SDKs
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    // Generate a mock Hedera account ID for demo
-    const mockAccountId = `0.0.${Math.floor(Math.random() * 9000000) + 1000000}`;
-    
-    onConnect(mockAccountId);
-    setIsConnecting(false);
+  const handleConnect = () => {
+    // Basic validation for Hedera Account ID (0.0.x)
+    const hederaIdRegex = /^0\.0\.\d+$/;
+
+    if (!hederaIdRegex.test(manualId)) {
+      toast({
+        title: "Invalid ID",
+        description: "Please enter a valid Hedera Account ID (e.g., 0.0.12345)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    onConnect(manualId);
     setIsOpen(false);
-    
+    setManualId("");
+
     toast({
       title: "Wallet Connected",
-      description: `Connected to ${mockAccountId}`,
+      description: `Connected to ${manualId}`,
     });
   };
 
@@ -77,6 +84,16 @@ export function WalletConnect({ walletId, onConnect, compact = false }: WalletCo
             {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
           </Button>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setManualId(walletId);
+            setIsOpen(true);
+          }}
+        >
+          Change
+        </Button>
       </div>
     );
   }
@@ -97,59 +114,42 @@ export function WalletConnect({ walletId, onConnect, compact = false }: WalletCo
         <DialogHeader>
           <DialogTitle className="font-serif text-xl">Connect Your Wallet</DialogTitle>
           <DialogDescription>
-            Choose a Hedera wallet to connect and receive your attendance badges.
+            Enter your Hedera Account ID to connect your wallet.
           </DialogDescription>
         </DialogHeader>
+
         <div className="grid gap-4 py-4">
-          <Button
-            variant="outline"
-            className="h-16 justify-start gap-4"
-            onClick={() => handleConnect("hashpack")}
-            disabled={isConnecting}
-            data-testid="button-connect-hashpack"
-          >
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">H</span>
-            </div>
-            <div className="text-left">
-              <div className="font-semibold">HashPack</div>
-              <div className="text-sm text-muted-foreground">Popular Hedera wallet</div>
-            </div>
-            {isConnecting && (
-              <div className="ml-auto animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent" />
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            className="h-16 justify-start gap-4"
-            onClick={() => handleConnect("blade")}
-            disabled={isConnecting}
-            data-testid="button-connect-blade"
-          >
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-400 to-teal-500 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">B</span>
-            </div>
-            <div className="text-left">
-              <div className="font-semibold">Blade Wallet</div>
-              <div className="text-sm text-muted-foreground">Fast & secure</div>
-            </div>
-            {isConnecting && (
-              <div className="ml-auto animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent" />
-            )}
-          </Button>
+          <div className="grid gap-2">
+            <Label htmlFor="wallet-id">Hedera Account ID</Label>
+            <Input
+              id="wallet-id"
+              placeholder="0.0.123456"
+              value={manualId}
+              onChange={(e) => setManualId(e.target.value)}
+              data-testid="input-wallet-id"
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter your account ID from HashPack, Blade, or other Hedera wallets.
+            </p>
+          </div>
         </div>
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <ExternalLink className="h-4 w-4" />
-          <span>New to Hedera?</span>
-          <a
-            href="https://hedera.com/wallets"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary underline"
-          >
-            Get a wallet
-          </a>
-        </div>
+
+        <DialogFooter className="flex-col sm:justify-between sm:flex-row gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <ExternalLink className="h-3 w-3" />
+            <a
+              href="https://hedera.com/wallets"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline"
+            >
+              Need a wallet?
+            </a>
+          </div>
+          <Button onClick={handleConnect} data-testid="button-confirm-wallet">
+            Connect
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

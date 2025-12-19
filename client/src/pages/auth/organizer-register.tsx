@@ -144,19 +144,11 @@ export default function OrganizerRegister() {
 
                 <div className="space-y-2">
                   <FormLabel>Hedera Wallet (Optional)</FormLabel>
-                  <div className="flex items-center gap-2">
-                    {form.watch("hederaAccountId") ? (
-                      <div className="flex-1 px-3 py-2 bg-muted rounded-md font-mono text-sm">
-                        {form.watch("hederaAccountId")}
-                      </div>
-                    ) : (
-                      <WalletConnect
-                        walletId={form.watch("hederaAccountId")}
-                        onConnect={handleWalletConnect}
-                        compact
-                      />
-                    )}
-                  </div>
+                  <WalletConnect
+                    walletId={form.watch("hederaAccountId")}
+                    onConnect={handleWalletConnect}
+                    compact
+                  />
                   <p className="text-xs text-muted-foreground">
                     Connect your wallet to receive NFT minting fees (optional for testnet)
                   </p>

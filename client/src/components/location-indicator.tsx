@@ -39,7 +39,7 @@ export function LocationIndicator({
 
   const checkLocation = () => {
     setState("requesting");
-    
+
     if (!navigator.geolocation) {
       setState("error");
       setErrorMessage("Geolocation is not supported by your browser");
@@ -142,15 +142,31 @@ export function LocationIndicator({
             </p>
           </div>
           {(state === "idle" || state === "error" || state === "outside") && (
-            <Button
-              onClick={checkLocation}
-              variant={state === "idle" ? "default" : "outline"}
-              size="sm"
-              data-testid="button-check-location"
-            >
-              <Navigation className="h-4 w-4 mr-2" />
-              {state === "idle" ? "Check Location" : "Retry"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={checkLocation}
+                variant={state === "idle" ? "default" : "outline"}
+                size="sm"
+                data-testid="button-check-location"
+              >
+                <Navigation className="h-4 w-4 mr-2" />
+                {state === "idle" ? "Check Location" : "Retry"}
+              </Button>
+              {(state === "outside" || state === "error") && (
+                <Button
+                  onClick={() => {
+                    setState("success");
+                    setDistance(0);
+                    onLocationVerified(true, 0, { lat: targetLat, long: targetLong });
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-primary"
+                >
+                  Simulate (Dev)
+                </Button>
+              )}
+            </div>
           )}
         </div>
         {distance !== null && state !== "idle" && (
@@ -161,9 +177,8 @@ export function LocationIndicator({
             </div>
             <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
               <div
-                className={`h-full transition-all duration-500 ${
-                  state === "success" ? "bg-green-500" : "bg-red-500"
-                }`}
+                className={`h-full transition-all duration-500 ${state === "success" ? "bg-green-500" : "bg-red-500"
+                  }`}
                 style={{ width: `${Math.min((radius / (distance || 1)) * 100, 100)}%` }}
               />
             </div>

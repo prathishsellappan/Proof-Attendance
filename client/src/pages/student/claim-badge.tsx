@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useParams, useLocation } from "wouter";
-import { ArrowLeft, CheckCircle, XCircle, Award, MapPin, Clock, Loader2, Wallet, Calendar } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Award, MapPin, Clock, Loader2, Wallet, Calendar, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,7 +26,7 @@ export default function ClaimBadge() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   const [locationVerified, setLocationVerified] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; long: number } | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
@@ -51,20 +51,20 @@ export default function ClaimBadge() {
     mutationFn: async () => {
       setIsClaiming(true);
       setMintingStep(1);
-      
+
       // Simulate minting steps
       await new Promise(r => setTimeout(r, 1000));
       setMintingStep(2);
-      
+
       const res = await apiRequest("POST", `/api/events/${id}/claim`, {
         studentId: user?.id,
         location: userLocation,
         walletSignature: "simulated_signature",
       });
-      
+
       setMintingStep(3);
       await new Promise(r => setTimeout(r, 500));
-      
+
       return res.json();
     },
     onSuccess: () => {
@@ -122,6 +122,62 @@ export default function ClaimBadge() {
     { step: 2, label: "Minting NFT on Hedera" },
     { step: 3, label: "Transferring to your wallet" },
   ];
+
+  // Success view if already claimed
+  if (registration?.claimed && event) {
+    return (
+      <div className="min-h-screen bg-background">
+        <nav className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
+            <Link href="/student/dashboard">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <ArrowLeft className="w-4 h-4" />
+                Back to Dashboard
+              </Button>
+            </Link>
+            <ThemeToggle />
+          </div>
+        </nav>
+
+        <main className="max-w-2xl mx-auto px-6 py-12 text-center">
+          <Card className="mb-8 border-primary/50 bg-primary/5">
+            <CardContent className="pt-8 pb-8">
+              <div className="w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="w-12 h-12 text-green-600 dark:text-green-400" />
+              </div>
+              <h1 className="text-3xl font-bold font-serif mb-2">Badge Claimed!</h1>
+              <p className="text-muted-foreground mb-8">
+                You have successfully claimed the attendance badge for <span className="font-semibold text-foreground">{event.name}</span>
+              </p>
+
+              <div className="w-64 h-64 mx-auto rounded-xl overflow-hidden shadow-2xl mb-8 transform hover:scale-105 transition-transform duration-300">
+                {event.badgeImageCID ? (
+                  <img
+                    src={event.badgeImageCID.startsWith("bafybei")
+                      ? `/api/uploads/${event.badgeImageCID}`
+                      : `https://gateway.pinata.cloud/ipfs/${event.badgeImageCID}`
+                    }
+                    alt="Badge"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-muted flex items-center justify-center">
+                    <Award className="w-20 h-20 text-muted-foreground/30" />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-center gap-4">
+                <Link href="/student/dashboard">
+                  <Button variant="outline">View All Badges</Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
 
   if (eventLoading) {
     return (
@@ -230,13 +286,12 @@ export default function ClaimBadge() {
               <div className="space-y-4">
                 {mintingSteps.map((step) => (
                   <div key={step.step} className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      mintingStep > step.step 
-                        ? "bg-green-100 dark:bg-green-900/30" 
-                        : mintingStep === step.step 
-                          ? "bg-primary/10" 
-                          : "bg-muted"
-                    }`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${mintingStep > step.step
+                      ? "bg-green-100 dark:bg-green-900/30"
+                      : mintingStep === step.step
+                        ? "bg-primary/10"
+                        : "bg-muted"
+                      }`}>
                       {mintingStep > step.step ? (
                         <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
                       ) : mintingStep === step.step ? (
@@ -268,11 +323,10 @@ export default function ClaimBadge() {
               {requirements.map((req) => (
                 <div
                   key={req.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg ${
-                    req.met 
-                      ? "bg-green-50 dark:bg-green-900/20" 
-                      : "bg-muted"
-                  }`}
+                  className={`flex items-center gap-3 p-3 rounded-lg ${req.met
+                    ? "bg-green-50 dark:bg-green-900/20"
+                    : "bg-muted"
+                    }`}
                 >
                   {req.checking ? (
                     <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
@@ -304,16 +358,59 @@ export default function ClaimBadge() {
 
         {/* Claim Button */}
         {!isClaiming && (
-          <Button
-            size="lg"
-            className="w-full gap-2"
-            disabled={!allRequirementsMet}
-            onClick={() => claimMutation.mutate()}
-            data-testid="button-claim-badge"
-          >
-            <Award className="w-5 h-5" />
-            Claim Badge
-          </Button>
+          <>
+            <Card className="mb-6 border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-900/10">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-full">
+                    <Info className="w-6 h-6 text-blue-600 dark:text-blue-300" />
+                  </div>
+                  <div className="space-y-2 flex-1">
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-100">
+                      Important: Associate Token Required
+                    </h3>
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      Before claiming, you must associate the following Token ID in your HashPack wallet.
+                      Without this, the NFT cannot be sent to you.
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <code className="bg-white dark:bg-black/20 px-3 py-1 rounded border border-blue-200 dark:border-blue-800 font-mono font-medium select-all">
+                        {event.tokenId || "Loading..."}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (event.tokenId) {
+                            navigator.clipboard.writeText(event.tokenId);
+                            toast({ description: "Token ID copied to clipboard" });
+                          }
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Button
+              size="lg"
+              className="w-full"
+              disabled={!requirements.every((req) => req.met) || claimMutation.isPending}
+              onClick={() => claimMutation.mutate()}
+            >
+              {claimMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Minting & Transferring...
+                </>
+              ) : (
+                "Claim Badge"
+              )}
+            </Button>
+          </>
         )}
 
         {/* Wallet Not Connected Warning */}

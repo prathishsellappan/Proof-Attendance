@@ -24,7 +24,7 @@ export function EventCard({
   onManage,
 }: EventCardProps) {
   const formattedDate = event.date ? format(new Date(event.date), "MMM d, yyyy") : "TBD";
-  
+
   const getStatus = () => {
     if (userRegistration?.claimed) return "CLAIMED";
     if (userRegistration) return "REGISTERED";
@@ -36,7 +36,10 @@ export function EventCard({
       <div className="aspect-video relative overflow-hidden bg-gradient-to-br from-primary/20 to-primary/5">
         {event.badgeImageCID ? (
           <img
-            src={`https://gateway.pinata.cloud/ipfs/${event.badgeImageCID}`}
+            src={event.badgeImageCID?.startsWith("bafybei")
+              ? `/api/uploads/${event.badgeImageCID}`
+              : `https://gateway.pinata.cloud/ipfs/${event.badgeImageCID}`
+            }
             alt={`${event.name} badge`}
             className="w-full h-full object-cover"
           />
@@ -51,7 +54,7 @@ export function EventCard({
           <StatusBadge status={getStatus()} size="sm" />
         </div>
       </div>
-      
+
       <CardHeader className="pb-2">
         <h3 className="font-serif font-semibold text-lg line-clamp-2" data-testid="text-event-name">
           {event.name}
@@ -94,9 +97,9 @@ export function EventCard({
         ) : (
           <>
             {!userRegistration ? (
-              <Button 
-                onClick={onRegister} 
-                className="w-full" 
+              <Button
+                onClick={onRegister}
+                className="w-full"
                 data-testid="button-register-event"
               >
                 Register

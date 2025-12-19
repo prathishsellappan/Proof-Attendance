@@ -459,7 +459,7 @@ export async function registerRoutes(
         venueLong: parseFloat(venueLong),
         radius: parseInt(radius),
         badgeImageCID,
-        attendanceStatus: "OPEN", // Auto-open for testing
+        attendanceStatus: "CLOSED", // Default closed, organizer must open manually
         organizerId: user.id,
         tokenId,
       });

@@ -514,7 +514,25 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Organizer access required" });
       }
       const registrations = await storage.getRegistrationsByEvent(req.params.id);
-      res.json(registrations);
+
+      // Fetch student details for each registration
+      const registrationsWithStudent = await Promise.all(
+        registrations.map(async (reg) => {
+          const student = await storage.getStudent(reg.studentId);
+          return {
+            ...reg,
+            student: student ? {
+              name: student.name,
+              email: student.email,
+              college: student.college,
+              rollNo: student.rollNo,
+              department: student.department
+            } : null
+          };
+        })
+      );
+
+      res.json(registrationsWithStudent);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

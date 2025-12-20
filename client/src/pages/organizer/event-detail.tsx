@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useParams } from "wouter";
-import { ArrowLeft, Play, Square, Users, Award, MapPin, Calendar, Clock, Copy, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Square, Users, Award, MapPin, Calendar, Clock, Copy, ExternalLink, Loader2, Download, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,6 +12,14 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Event, Registration, Student } from "@shared/schema";
 import { format } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface RegistrationWithStudent extends Registration {
   student?: Student;
@@ -39,8 +47,8 @@ export default function OrganizerEventDetail() {
       await queryClient.invalidateQueries({ queryKey: ["/api/events", id] });
       toast({
         title: newStatus === "OPEN" ? "Attendance Started" : "Attendance Stopped",
-        description: newStatus === "OPEN" 
-          ? "Students can now claim their badges." 
+        description: newStatus === "OPEN"
+          ? "Students can now claim their badges."
           : "Badge claiming is now disabled.",
       });
     } catch (error: any) {
@@ -57,6 +65,40 @@ export default function OrganizerEventDetail() {
   const copyToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
     toast({ title: "Copied", description: "Copied to clipboard" });
+  };
+
+  const downloadCSV = () => {
+    if (!registrations || registrations.length === 0) {
+      toast({ title: "No Data", description: "No registrations to download.", variant: "destructive" });
+      return;
+    }
+
+    const headers = ["Student Name", "Email", "College", "Roll No", "Wallet Address", "Registration Date", "Status", "NFT Serial"];
+
+    const rows = registrations.map(reg => [
+      reg.student?.name || "N/A",
+      reg.student?.email || "N/A",
+      reg.student?.college || "N/A",
+      reg.student?.rollNo || "N/A",
+      reg.studentAccountId || "N/A",
+      reg.registeredAt ? format(new Date(reg.registeredAt), "yyyy-MM-dd HH:mm:ss") : "N/A",
+      reg.claimed ? "CLAIMED" : "REGISTERED",
+      reg.nftSerial || "N/A"
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${event?.name.replace(/\s+/g, '_')}_registrations.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (eventLoading) {
@@ -197,11 +239,93 @@ export default function OrganizerEventDetail() {
 
             {/* Registrations Table */}
             <Card>
-              <CardHeader>
-                <CardTitle>Registrations</CardTitle>
-                <CardDescription>
-                  Students who registered for this event
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Registrations</CardTitle>
+                  <CardDescription>
+                    Students who registered for this event
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <Eye className="w-4 h-4" />
+                        View All
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>Student Registrations</DialogTitle>
+                        <DialogDescription>
+                          Detailed list of all students registered for {event.name}.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Student Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>College</TableHead>
+                            <TableHead>Roll No</TableHead>
+                            <TableHead>Wallet Status</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {registrations && registrations.length > 0 ? (
+                            registrations.map((reg) => (
+                              <TableRow key={reg.id}>
+                                <TableCell className="font-medium">
+                                  {reg.student?.name || "N/A"}
+                                </TableCell>
+                                <TableCell>{reg.student?.email || "N/A"}</TableCell>
+                                <TableCell>{reg.student?.college || "N/A"}</TableCell>
+                                <TableCell>{reg.student?.rollNo || "N/A"}</TableCell>
+                                <TableCell>
+                                  {reg.studentAccountId ? (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-xs">
+                                        {reg.studentAccountId.substring(0, 10)}...
+                                      </span>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-4 w-4"
+                                        onClick={() => copyToClipboard(reg.studentAccountId!)}
+                                      >
+                                        <Copy className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground text-xs">No Wallet</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <StatusBadge
+                                    status={reg.claimed ? "CLAIMED" : "REGISTERED"}
+                                    size="sm"
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center text-muted-foreground">
+                                No registrations found.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Button variant="outline" size="sm" className="gap-2" onClick={downloadCSV}>
+                    <Download className="w-4 h-4" />
+                    CSV
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {registrationsLoading ? (
@@ -220,7 +344,7 @@ export default function OrganizerEventDetail() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {registrations.map((reg) => (
+                      {registrations.slice(0, 5).map((reg) => (
                         <TableRow key={reg.id}>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -243,9 +367,9 @@ export default function OrganizerEventDetail() {
                             {reg.registeredAt ? format(new Date(reg.registeredAt), "MMM d, HH:mm") : "N/A"}
                           </TableCell>
                           <TableCell>
-                            <StatusBadge 
-                              status={reg.claimed ? "CLAIMED" : "REGISTERED"} 
-                              size="sm" 
+                            <StatusBadge
+                              status={reg.claimed ? "CLAIMED" : "REGISTERED"}
+                              size="sm"
                             />
                           </TableCell>
                         </TableRow>
@@ -256,6 +380,9 @@ export default function OrganizerEventDetail() {
                   <div className="text-center py-8 text-muted-foreground">
                     No registrations yet
                   </div>
+                )}
+                {registrations && registrations.length > 5 && (
+                  <p className="text-xs text-center text-muted-foreground mt-4">Showing recent 5 registrations. Click "View All" to see everyone.</p>
                 )}
               </CardContent>
             </Card>
